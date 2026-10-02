@@ -3,10 +3,11 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from i18n import LANGUAGES
 
 CONFIG_PATH = Path(os.environ.get('YTDL_CONFIG', str(Path.home() / '.ytdl_config.json')))
 QUALITIES = ('360', '480', '720', '1080', '1440', '2160', 'best', 'mp3')
-DEFAULTS = {'lang': None, 'quality': '720', 'folder': str(Path.home() / 'Downloads' / 'YouTube'), 'proxy': '', 'cookies': ''}
+DEFAULTS = {'lang': None, 'quality': '720', 'folder': str(Path.home() / 'Downloads' / 'Video'), 'proxy': '', 'cookies': ''}
 
 class ConfigError(Exception):
     pass
@@ -15,7 +16,7 @@ def validate(data):
     result = dict(DEFAULTS)
     if not isinstance(data, dict):
         return result
-    if data.get('lang') in ('ru', 'en'):
+    if data.get('lang') in LANGUAGES:
         result['lang'] = data['lang']
     if data.get('quality') in QUALITIES:
         result['quality'] = data['quality']

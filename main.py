@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""YouTube Downloader — консольное приложение."""
+# Copyright (C) 2026 Fousman34
+# SPDX-License-Identifier: GPL-3.0-only
+"""Video Downloader — консольное приложение."""
 import argparse
 import sys
 from pathlib import Path
@@ -14,7 +16,7 @@ from rich.text import Text
 
 import config
 from downloader import DownloadFailed, download
-from i18n import get_lang, set_lang, t
+from i18n import LANGUAGES, get_lang, set_lang, t
 from runtime import diagnostics
 from urls import normalize_url
 
@@ -118,7 +120,7 @@ def _error_panel(title: str, message: str, hint: str | None = None) -> None:
 
 # ─────────────────────── Идентификация URL ───────────────────────
 
-def _is_youtube(url: str) -> bool:
+def _is_video_url(url: str) -> bool:
     try:
         normalize_url(url)
         return True
@@ -131,10 +133,7 @@ def _is_youtube(url: str) -> bool:
 def ask_language() -> str | None:
     answer = _select(
         t("choose_language"),
-        choices=[
-            questionary.Choice(title=t("lang_ru"), value="ru"),
-            questionary.Choice(title=t("lang_en"), value="en"),
-        ],
+        choices=[questionary.Choice(title=name, value=code) for code, name in LANGUAGES.items()],
         qmark="›",
         instruction=" ",
     ).unsafe_ask()
@@ -163,7 +162,7 @@ def flow_download(cfg: dict) -> None:
     if not url:
         _error_panel(t("err_download_title"), t("err_url_empty"))
         return _pause()
-    if not _is_youtube(url):
+    if not _is_video_url(url):
         _error_panel(t("err_download_title"), t("err_url_invalid"))
         return _pause()
 
@@ -205,7 +204,7 @@ def flow_settings(cfg: dict) -> dict:
 
         console.print(Text(f"{t('folder_current')}: {cfg['folder']}", style='cyan'))
         console.print(f"[dim]{t('quality_current')}:[/] [cyan]{cfg['quality']}[/]")
-        lang_name = "Русский" if get_lang() == "ru" else "English"
+        lang_name = LANGUAGES[get_lang()]
         console.print(f"[dim]{t('lang_current')}:[/] [cyan]{lang_name}[/]")
         console.print()
 
@@ -262,7 +261,7 @@ def flow_settings(cfg: dict) -> dict:
 def flow_about() -> None:
     _banner()
     console.print(Panel(
-        Text.from_markup(t("about_text")),
+        Text.from_markup(t("about_text") + '\n\n' + t('author_license') + '\n' + t('license_notice')),
         title=f"[bold magenta]{t('about_title')}[/]",
         title_align="left",
         box=box.ROUNDED,
@@ -296,24 +295,37 @@ def _save(cfg):
 
 def show_diagnostics():
     import yt_dlp.version
-    console.print(Text('YouTube Downloader 1.0.1 | yt-dlp ' + yt_dlp.version.__version__))
+    console.print(Text('Video Downloader 1.1.0 | yt-dlp ' + yt_dlp.version.__version__))
     result = diagnostics()
     for name, version in result.items():
-        console.print(Text(f'{name}: {version}', style='yellow' if version in ('MISSING', 'ERROR') else 'green'))
-    console.print(Text(f'Config: {config.CONFIG_PATH}'))
-    return 0 if all(result[key] not in ('MISSING', 'ERROR') for key in ('ffmpeg', 'ffprobe')) and any(result[key] not in ('MISSING', 'ERROR') for key in ('node', 'deno')) else 1
+        display = t('missing_tool') if version == 'MISSING' else t('broken_tool') if version == 'ERROR' else version
+        console.print(Text(f'{name}: {display}', style='yellow' if version in ('MISSING', 'ERROR') else 'green'))
+    console.print(Text(f"{t('config_label')}: {config.CONFIG_PATH}"))
+    return 0 if all(result[key] not in ('MISSING', 'ERROR') for key in ('ffmpeg', 'ffprobe')) else 1
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='YouTube Downloader — RU / EN terminal application')
-    parser.add_argument('url', nargs='?', help='YouTube video URL (optional)')
-    parser.add_argument('--quality', choices=QUALITY_ORDER)
-    parser.add_argument('--folder')
-    parser.add_argument('--lang', choices=['ru', 'en'])
-    parser.add_argument('--proxy')
-    parser.add_argument('--cookies', help='Netscape cookies.txt file')
-    parser.add_argument('--doctor', action='store_true', help='Check dependencies')
-    parser.add_argument('--version', action='version', version='YouTube Downloader 1.0.1')
+    # Set language before argparse prints help, including --lang=es.
+    early = argparse.ArgumentParser(add_help=False)
+    early.add_argument('--lang', choices=list(LANGUAGES))
+    language, _ = early.parse_known_args()
+    try:
+        initial_lang = config.load().get('lang')
+    except config.ConfigError:
+        initial_lang = None
+    set_lang(language.lang or initial_lang or 'ru')
+    parser = argparse.ArgumentParser(description=t('app_tagline'), add_help=False)
+    parser._positionals.title = t('cli_arguments')
+    parser._optionals.title = t('cli_options')
+    parser.add_argument('-h', '--help', action='help', help=t('cli_help'))
+    parser.add_argument('url', nargs='?', help=t('prompt_url'))
+    parser.add_argument('--quality', choices=QUALITY_ORDER, help=t('setting_quality'))
+    parser.add_argument('--folder', help=t('setting_folder'))
+    parser.add_argument('--lang', choices=list(LANGUAGES), help=t('setting_lang'))
+    parser.add_argument('--proxy', help=t('setting_proxy'))
+    parser.add_argument('--cookies', help=t('setting_cookies'))
+    parser.add_argument('--doctor', action='store_true', help=t('menu_doctor'))
+    parser.add_argument('--version', action='version', version='Video Downloader 1.1.0', help=t('cli_version'))
     args = parser.parse_args()
     set_lang(args.lang or 'ru')
     try:
