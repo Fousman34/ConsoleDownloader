@@ -1,0 +1,3 @@
+yt-dlp[default]>=2026.8.19
+rich>=13.7,<15
+questionary>=2,<3
